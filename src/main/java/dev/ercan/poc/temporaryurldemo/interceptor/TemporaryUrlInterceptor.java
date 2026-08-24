@@ -5,8 +5,10 @@ import dev.ercan.poc.temporaryurldemo.service.TemporaryUrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
+import java.security.MessageDigest;
 import java.time.Instant;
 
 @RequiredArgsConstructor
@@ -15,7 +17,8 @@ public class TemporaryUrlInterceptor implements HandlerInterceptor {
   private final TemporaryUrlService temporaryUrlService;
 
   @Override
-  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+  public boolean preHandle(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler)
+      throws Exception {
 
     String signatureParam = request.getParameter(temporaryUrlService.getSignatureParam());
 
@@ -39,7 +42,7 @@ public class TemporaryUrlInterceptor implements HandlerInterceptor {
 
     String calculatedSignature = temporaryUrlService.calculateSignature(request.getMethod(), path, expires);
 
-    if (!calculatedSignature.equals(signatureParam)) {
+    if (!MessageDigest.isEqual(signatureParam.getBytes(), calculatedSignature.getBytes())) {
       throw new InvalidTemporaryUrlException(temporaryUrlService.getSignatureParam() + " not match");
     }
 
