@@ -1,11 +1,18 @@
 package dev.ercan.poc.temporaryurldemo.service;
 
+import dev.ercan.poc.temporaryurldemo.model.TemporaryUrlRequest;
+import dev.ercan.poc.temporaryurldemo.model.TemporaryUrlResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpMethod;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -17,13 +24,37 @@ class TemporaryUrlServiceTest {
 
   private TemporaryUrlService service;
   private static final String SECRET_KEY = "test-secret-key";
-  private static final String PROTECTED_BASE = "/protected";
+  private static final String PROTECTED_BASE = "/protected/";
 
   @BeforeEach
   void setUp() {
     service = new TemporaryUrlService();
     ReflectionTestUtils.setField(service, "secret", SECRET_KEY);
     ReflectionTestUtils.setField(service, "protectedBase", PROTECTED_BASE);
+  }
+
+  @AfterEach
+  void tearDown() {
+    RequestContextHolder.resetRequestAttributes();
+  }
+
+  @Test
+  @DisplayName("should create temporary url successfully")
+  void shouldCreateTemporaryUrlSuccessfully() throws NoSuchAlgorithmException, InvalidKeyException {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setScheme("http");
+    request.setServerName("localhost");
+    request.setServerPort(8080);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+    TemporaryUrlRequest urlRequest = new TemporaryUrlRequest(HttpMethod.POST, "123123123", 60L);
+    TemporaryUrlResponse response = service.createTemporaryUrl(urlRequest);
+
+    assertNotNull(response);
+    assertNotNull(response.url());
+    assertTrue(response.url().startsWith("http://localhost:8080/protected/123123123"));
+    assertTrue(response.url().contains("sig="));
+    assertTrue(response.url().contains("exp="));
   }
 
   @Test
@@ -114,31 +145,6 @@ class TemporaryUrlServiceTest {
 
     assertNotNull(basePath);
     assertEquals(PROTECTED_BASE, basePath);
-  }
-
-  @Test
-  @DisplayName("should include path in signature calculation")
-  void shouldIncludePathInSignatureCalculation() throws NoSuchAlgorithmException, InvalidKeyException {
-    String method = "GET";
-    long expires = 1692921600000L;
-
-    String sig1 = service.calculateSignature(method, "/protected/resource1", expires);
-    String sig2 = service.calculateSignature(method, "/protected/resource2", expires);
-
-    assertNotEquals(sig1, sig2);
-  }
-
-  @Test
-  @DisplayName("should verify signature with correct method and path")
-  void shouldVerifySignatureWithCorrectMethodAndPath() throws NoSuchAlgorithmException, InvalidKeyException {
-    String path = "/protected/myresource";
-    String method = "POST";
-    long expires = 1692921600000L;
-
-    String signature = service.calculateSignature(method, path, expires);
-
-    assertNotNull(signature);
-    assertFalse(signature.isEmpty());
   }
 
   @Test

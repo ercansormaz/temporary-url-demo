@@ -59,64 +59,76 @@ class TemporaryUrlInterceptorTest {
 
   @Test
   @DisplayName("should reject request when signature parameter is missing")
-  void shouldRejectRequestWhenSignatureParameterIsMissing() throws Exception {
+  void shouldRejectRequestWhenSignatureParameterIsMissing() {
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn(null);
 
-    assertThrows(InvalidTemporaryUrlException.class, 
+    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class, 
         () -> interceptor.preHandle(request, response, handler));
+
+    assertEquals("sig not present", exception.getMessage());
   }
 
   @Test
   @DisplayName("should reject request when signature parameter is empty")
-  void shouldRejectRequestWhenSignatureParameterIsEmpty() throws Exception {
+  void shouldRejectRequestWhenSignatureParameterIsEmpty() {
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn("");
 
-    assertThrows(InvalidTemporaryUrlException.class,
+    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
         () -> interceptor.preHandle(request, response, handler));
+
+    assertEquals("sig not present", exception.getMessage());
   }
 
   @Test
   @DisplayName("should reject request when signature parameter is whitespace")
-  void shouldRejectRequestWhenSignatureParameterIsWhitespace() throws Exception {
+  void shouldRejectRequestWhenSignatureParameterIsWhitespace() {
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn("   ");
 
-    assertThrows(InvalidTemporaryUrlException.class,
+    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
         () -> interceptor.preHandle(request, response, handler));
+
+    assertEquals("sig not present", exception.getMessage());
   }
 
   @Test
   @DisplayName("should reject request when expires parameter is missing")
-  void shouldRejectRequestWhenExpiresParameterIsMissing() throws Exception {
+  void shouldRejectRequestWhenExpiresParameterIsMissing() {
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
     when(request.getParameter(EXPIRES_PARAM)).thenReturn(null);
 
-    assertThrows(InvalidTemporaryUrlException.class,
+    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
         () -> interceptor.preHandle(request, response, handler));
+
+    assertEquals("exp not present", exception.getMessage());
   }
 
   @Test
   @DisplayName("should reject request when expires parameter is empty")
-  void shouldRejectRequestWhenExpiresParameterIsEmpty() throws Exception {
+  void shouldRejectRequestWhenExpiresParameterIsEmpty() {
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
     when(request.getParameter(EXPIRES_PARAM)).thenReturn("");
 
-    assertThrows(InvalidTemporaryUrlException.class,
+    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
         () -> interceptor.preHandle(request, response, handler));
+
+    assertEquals("exp not present", exception.getMessage());
   }
 
   @Test
   @DisplayName("should reject request when expires parameter is whitespace")
-  void shouldRejectRequestWhenExpiresParameterIsWhitespace() throws Exception {
+  void shouldRejectRequestWhenExpiresParameterIsWhitespace() {
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
     when(request.getParameter(EXPIRES_PARAM)).thenReturn("   ");
 
-    assertThrows(InvalidTemporaryUrlException.class,
+    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
         () -> interceptor.preHandle(request, response, handler));
+
+    assertEquals("exp not present", exception.getMessage());
   }
 
   @Test
   @DisplayName("should reject request with expired token")
-  void shouldRejectRequestWithExpiredToken() throws Exception {
+  void shouldRejectRequestWithExpiredToken() {
     long pastExpires = Instant.now().minusSeconds(3600).toEpochMilli();
 
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
@@ -147,22 +159,6 @@ class TemporaryUrlInterceptorTest {
     assertEquals("sig not match", exception.getMessage());
   }
 
-  @Test
-  @DisplayName("should reject request when calculated signature does not match provided signature")
-  void shouldRejectRequestWhenCalculatedSignatureDoesNotMatch() throws Exception {
-    long futureExpires = Instant.now().plusSeconds(3600).toEpochMilli();
-    String path = "/protected/resource";
-
-    when(request.getParameter(SIGNATURE_PARAM)).thenReturn("wrong-signature");
-    when(request.getParameter(EXPIRES_PARAM)).thenReturn(String.valueOf(futureExpires));
-    when(request.getRequestURI()).thenReturn(path);
-    when(request.getMethod()).thenReturn("GET");
-    when(temporaryUrlService.calculateSignature("GET", path, futureExpires)).thenReturn("correct-signature");
-
-    assertThrows(InvalidTemporaryUrlException.class,
-        () -> interceptor.preHandle(request, response, handler));
-  }
-
   @ParameterizedTest
   @ValueSource(strings = {"GET", "POST", "PUT", "DELETE", "PATCH"})
   @DisplayName("should work with different HTTP methods")
@@ -182,20 +178,21 @@ class TemporaryUrlInterceptorTest {
   }
 
   @Test
-  @DisplayName("should use request URI for signature calculation")
-  void shouldUseRequestUriForSignatureCalculation() throws Exception {
+  @DisplayName("should use request URI and method for signature calculation")
+  void shouldUseRequestUriAndMethodForSignatureCalculation() throws Exception {
     long futureExpires = Instant.now().plusSeconds(3600).toEpochMilli();
     String path = "/protected/resource/123";
+    String method = "POST";
 
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
     when(request.getParameter(EXPIRES_PARAM)).thenReturn(String.valueOf(futureExpires));
     when(request.getRequestURI()).thenReturn(path);
-    when(request.getMethod()).thenReturn("GET");
-    when(temporaryUrlService.calculateSignature("GET", path, futureExpires)).thenReturn(VALID_SIGNATURE);
+    when(request.getMethod()).thenReturn(method);
+    when(temporaryUrlService.calculateSignature(method, path, futureExpires)).thenReturn(VALID_SIGNATURE);
 
     interceptor.preHandle(request, response, handler);
 
-    verify(temporaryUrlService).calculateSignature("GET", path, futureExpires);
+    verify(temporaryUrlService).calculateSignature(method, path, futureExpires);
   }
 
   @Test
@@ -216,73 +213,11 @@ class TemporaryUrlInterceptorTest {
 
   @Test
   @DisplayName("should reject request with malformed expires parameter")
-  void shouldRejectRequestWithMalformedExpiresParameter() throws Exception {
+  void shouldRejectRequestWithMalformedExpiresParameter() {
     when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
     when(request.getParameter(EXPIRES_PARAM)).thenReturn("not-a-number");
 
     assertThrows(NumberFormatException.class,
         () -> interceptor.preHandle(request, response, handler));
-  }
-
-  @Test
-  @DisplayName("should verify signature with correct method and path")
-  void shouldVerifySignatureWithCorrectMethodAndPath() throws Exception {
-    long futureExpires = Instant.now().plusSeconds(3600).toEpochMilli();
-    String path = "/protected/myresource";
-    String method = "POST";
-
-    when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
-    when(request.getParameter(EXPIRES_PARAM)).thenReturn(String.valueOf(futureExpires));
-    when(request.getRequestURI()).thenReturn(path);
-    when(request.getMethod()).thenReturn(method);
-    when(temporaryUrlService.calculateSignature(method, path, futureExpires)).thenReturn(VALID_SIGNATURE);
-
-    interceptor.preHandle(request, response, handler);
-
-    verify(temporaryUrlService).calculateSignature(method, path, futureExpires);
-  }
-
-  @Test
-  @DisplayName("should throw exception with correct message when signature parameter missing")
-  void shouldThrowExceptionWithCorrectMessageWhenSignatureParameterMissing() throws Exception {
-    when(request.getParameter(SIGNATURE_PARAM)).thenReturn(null);
-
-    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
-        () -> interceptor.preHandle(request, response, handler));
-
-    assertTrue(exception.getMessage().contains("sig"));
-    assertTrue(exception.getMessage().contains("not present"));
-  }
-
-  @Test
-  @DisplayName("should throw exception with correct message when expires parameter missing")
-  void shouldThrowExceptionWithCorrectMessageWhenExpiresParameterMissing() throws Exception {
-    when(request.getParameter(SIGNATURE_PARAM)).thenReturn(VALID_SIGNATURE);
-    when(request.getParameter(EXPIRES_PARAM)).thenReturn(null);
-
-    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
-        () -> interceptor.preHandle(request, response, handler));
-
-    assertTrue(exception.getMessage().contains("exp"));
-    assertTrue(exception.getMessage().contains("not present"));
-  }
-
-  @Test
-  @DisplayName("should throw exception with correct message when signature not match")
-  void shouldThrowExceptionWithCorrectMessageWhenSignatureNotMatch() throws Exception {
-    long futureExpires = Instant.now().plusSeconds(3600).toEpochMilli();
-    String path = "/protected/resource";
-
-    when(request.getParameter(SIGNATURE_PARAM)).thenReturn("wrong");
-    when(request.getParameter(EXPIRES_PARAM)).thenReturn(String.valueOf(futureExpires));
-    when(request.getRequestURI()).thenReturn(path);
-    when(request.getMethod()).thenReturn("GET");
-    when(temporaryUrlService.calculateSignature("GET", path, futureExpires)).thenReturn("correct");
-
-    InvalidTemporaryUrlException exception = assertThrows(InvalidTemporaryUrlException.class,
-        () -> interceptor.preHandle(request, response, handler));
-
-    assertTrue(exception.getMessage().contains("sig"));
-    assertTrue(exception.getMessage().contains("not match"));
   }
 }

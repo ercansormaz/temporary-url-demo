@@ -18,6 +18,14 @@ class HMacUtilTest {
   private static final String TEST_DATA = "GET\n1692921600000\n/protected/resource";
 
   @Test
+  @DisplayName("should reflect private constructor")
+  void shouldReflectPrivateConstructor() throws Exception {
+    var constructor = HMacUtil.class.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    assertNotNull(constructor.newInstance());
+  }
+
+  @Test
   @DisplayName("should generate valid HMAC for given data and key")
   void shouldGenerateValidHmac() throws NoSuchAlgorithmException, InvalidKeyException {
     String result = HMacUtil.hmac(TEST_DATA, TEST_KEY);
